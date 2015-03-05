@@ -1,0 +1,57 @@
+---
+layout: post
+title:  "libvirt with openvswitch"
+date:   2015-01-20 20:12:00
+categories: OpenStack
+---
+<h3>问题</h3>
+<p>linux bridge不支持vlan, openvswitch支持. 在虚拟机环境中测试neutron的vlan功能时需要宿主机的虚拟网支持vlan.</p>
+<h3>安装openvswitch</h3>
+<ol>
+<li>启用rdo源</li>
+<li>
+<p>安装openvswitch</p>
+<pre><code>yum install -y openvswitch
+</code></pre>
+</li>
+<li>
+<p>开启openvswitch服务</p>
+<pre><code>systemctl enable openvswitch
+systemctl start openvswitch
+</code></pre>
+</li>
+</ol>
+<h3>配置openvswitch和libvirt</h3>
+<ol>
+<li>
+<p>建立openvswitch桥</p>
+<pre><code>ovs-vsctl add-br testbr0
+</code></pre>
+</li>
+<li>
+<p>更改libvirt配置</p>
+</li>
+</ol>
+<p>这里演示了一个虚拟网络允许通过vlan 47, 将vlan 42的摘掉vlan tag.<br />
+network部分:</p>
+<pre><code>$ virsh net-edit test_net
+&lt;network&gt;
+&lt;name&gt;test_net&lt;/name&gt;
+&lt;forward mode='bridge'/&gt;
+&lt;bridge name='testbr0' /&gt;
+&lt;vlan trunk='yes'&gt;
+    &lt;tag id='47'/&gt;
+    &lt;tag id='42' nativeMode='untagged'/&gt;
+&lt;/vlan&gt;
+&lt;virtualport type='openvswitch'/&gt;
+&lt;/network&gt;
+</code></pre>
+<p>虚拟机interface部分:</p>
+<pre><code>$ virsh edit test_vm
+    ... ...
+&lt;interface type='network'&gt;
+    &lt;source network='test_net'/&gt;
+    &lt;model type='virtio'/&gt;
+&lt;/interface&gt;
+    ... ...
+</code></pre>

@@ -1,0 +1,95 @@
+---
+layout: post
+title:  "Fuel 架构简介"
+date:   2015-01-16 19:50:00
+categories: OpenStack
+---
+### Fuel是什么
+
+根据Fuel的wiki上所说, 这又是一个openstack的部署和管理工具, 仅此而已;
+与其它部署工具(foreman/staypuft, juju等)的区别在于fuel不是platform-specific的, 也不用向平台和厂商妥协.  
+Fuel有在线的demo环境: http://demo.fuel-infra.org:8000/
+
+### Fuel关键功能
+* 硬件机器自动发现
+* 基于界面的网卡与磁盘配置
+* 多openstack集群管理
+* HA和非HA的部署方式
+* 安装前的环境检查和网络环境验证
+* 安装后的功能测试
+* 在界面上实时查看各节点的日志
+* 支持centos和ubuntu两种发行版, 亦可扩展来支持其它发行版
+* 支持多openstack版本
+
+功能并不见奇, 不过在实际测试过程中发现, fuel所提供的这些功能的特点是其简明和稳定, 在每一个功能上都是刚刚好把任务完成,并不去涉及更多内容, 个人认为任务完成得也相当优秀.
+
+### 整体框架
+![Fuel Architecture](https://wiki.openstack.org/w/images/3/3a/Fuel-architecture.png)
+
+1. 模块
+    * [fuel-web](https://github.com/stackforge/fuel-web)  
+        该模块也即fuel的核心运作模块nailgun, nailgun管理部署所需要的所有信息, 包括磁盘与网络配置, 节点角色等,
+        它负责整个部署过程中各项任务的编排. 该模块同时也提供了fuel的界面/CLI, 另外nailgun对外有提供rest api.
+        nailgun将数据存储在postgresql数据库, 通过AMQP将任务下发给执行者(astute worker). 使用python编写.
+    * [fuel-astute](https://github.com/stackforge/fuel-astute)  
+        该模块通过AMQP接收nailgun的命令, 并执行. 它将命令解析分发给其背后的cobbler, mcollective和puppet等服务,
+        astute即是对这些服务的一个整合封装. 根据任务的不同, 它可以通过XML-RPC让cobbler去完成一项系统部署任务,
+        或者让mcollective控制openstack部署节点上的mcollective agent做一件事, 抑或者在本地执行一些shell脚本, mcollective
+        agent则将任务下发给自己的plugin, 例如puppetd, puppetsync, uploadfile等. ruby编写.
+    * [fuel-main](https://github.com/stackforge/fuel-main)  
+        该模块是负责fuel iso的制作的.
+    * [fuel-ostf](https://github.com/stackforge/fuel-ostf)  
+        OSTF, 即OpenStack Testing Framework, 体现在fuel界面上就是Health Check标签, 它是openstack功能测试模块, 与rally
+        的区别是它比较轻量, 它的目标是用最短的时间测试尽量多的openstack功能.
+        该模块在这里被用来验证一个部署好的openstack的功能是否完好, 也可以从fuel中拿出来单独使用. python编写.
+    * [fuel-library](https://github.com/stackforge/fuel-library)
+        经过fuel自定义的puppet模块, fuel部署openstack软件的工作最终是落实到puppet上面的.
+    * [fuel-docs](https://github.com/stackforge/fuel-docs)
+        文档
+2. 服务组件
+    * [Cobbler](http://www.cobblerd.org/), 其于网络的操作系统部署服务, fuel有计划将该组件更换为openstack的ironic[链接](https://blueprints.launchpad.net/fuel/+spec/cobbler-ironic-substitute)
+    * [Puppet](http://puppetlabs.com/puppet), 目前fuel支持的唯一一个部署服务, 不过就设计上来说, fuel具备使用chef, saltstack来替换puppet的能力.
+    * [Mcollective](http://puppetlabs.com/mcollective), 一个高端版的func/fabric, 并行任务执行系统,
+        puppet和chef等都可以作为它的plugin被它来控制使用. fuel正是使用mcollective来调用puppet的.
+
+3. 模块协作流程
+
+    fuel部署openstack的过程中, 会有三种角色的节点出现: Master Node, Discovered Node, Managed Node.
+    Master Node是fuel的主要部分, 其几乎全部的服务都跑在Master Node上面, 整个部署正是从这个节点上发起的;  
+    Discovered Node是fuel发现了但还未分配任何角色的节点;  
+    Managed Node是fuel已经分配了角色并安装了系统的节点.  
+    * 硬件机器自动发现
+        ![fuel-discover](/images/fuel-discover.png)
+        Master Node上有一个fuel提供的pxe启动服务, 当一个同局域网内的新节点选择从网络启动,
+        它就可以通过fuel提供的pxe服务启动起来. fuel提供的pxe启动服务中有一个bootstrap镜像是专门为这种新节点准备的,
+        成功启动的bootstrap系统中有一个nailgun agent(包含mcollective), 该agent将负责收集新节点上的硬件信息通过nailgun的rest api传回给Master Node.  
+        经过这样一个流程, 这个新节点就变为了一个Discovered Node.
+
+    * 系统安装
+        ![fuel-provision](/images/fuel-provision.png)
+        系统安装发生在用户已在fuel界面上编辑完部署配置信息之后, 他/她此时点下deploy按钮, 整个部署流程开始走起,
+        第一步便是为Discovered Node安装操作系统. 
+        1. deploy按钮产生了对nailgun的一次rest调用, 之后nailgun将这次部署的配置信息封装为JSON数据, 把一条部署任务扔到AMQP中完事；
+        2. Astute从AMQP中捡起nailgun抛出的任务, 它通过XML-RPC通知cobbler准备好预部署节点的配置, 然后命令在Discovered
+        Node上的mcollective重启机器. 机器重启之后将依靠cobbler提供的网络安装服务来安装系统.
+        3. Discovered Node安装系统完成之后就成为了Managed Node, Managed Node之中已经默认启动了fuel预准备的mcollective服务,
+        该服务时刻监听AMQP等待命令.
+
+    * openstack软件部署
+        ![fuel-deployment](/images/fuel-deployment.png)
+        Astute将Managed Node上需要执行的任务命令通过AMQP传送给Managed Node上的mcollective agents(一些ruby脚本).
+        1. 首先,
+        astute通过mcollective的uploadfile这个agent将节点的配置信息写入节点上的/etc/astute.yaml文件.该文件包含了部署本节点所需要的所有配置信息和变量
+        2. astute利用puppetsyncd这个agents从Master Node同步最新的puppet模块, 其实就是一个rsync过程.
+        3. 模块同步完成之后, mcollective 调用puppet去执行软件安装, astutte定时向mcollective询问puppet执行的状态.
+        4. puppet解析/etc/astute.yaml传递给各个class去执行具体的操作.
+        5. astute会作下面一些额外的工作:
+            * 部署过程中将fuel界面上设置的ssh公钥上传Managed Node
+            * 在部署开始之前调用network_verify.py去执行网络环境检查
+            * 在部署完成之后的openstack环境中上传一个cirros镜像至glance
+            * 更新/etc/hosts文件
+            * 上传radosGW映射表至ceph节点
+    
+    * 环境擦除  
+        当一个Managed Node被删除, mcollective会擦除所有引导扇区, 该节点重启之后又将从bootstrap image启动, 成为一个Discovered
+        Node.
