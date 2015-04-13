@@ -32,7 +32,7 @@ AMQP(Advanced Message Queuing Protocol)，即高级消息队列协议，是一�
 消息代理(message brokers)从发布者/生产者(publishers/producers)接收消息，然后根据  
 既定的路由规则把接收到的消息发送给消息的处理者，即消费者(consumers)。
 
-![rabbitmq1](/rabbitmq1.png)
+![rabbitmq1](/images/rabbitmq1.png)
 
 消息代理(message brokers)包括两部分，交换机(exchange)和队列(queue)。
 发布者(publisher)发布消息(message)时可以为消息设置很多属性(message meta-data)。
