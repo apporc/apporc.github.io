@@ -7,18 +7,18 @@ categories: rabbitmq
 
 #### Table of Contents
 
-1. [安装](#a)
-2. [配置简介](#b)
-    * [配置文件](#ca)
-    * [用户管理](#cb)
-    * [防火墙](#cc)
-    * [system limits](#)
-3. [RabbitMQ 集群]()
-    * [手动创建集群](#)
-    * [重启集群](#)
-    * [破坏集群](#)
-    * [自动创建集群](#)
-4. [fuel中的RabbitMQ](#ee)
+1. [安装](#section)
+2. [配置简介](#section-1)
+    * [配置文件](#section-2)
+    * [用户管理](#section-3)
+    * [防火墙](#section-4)
+    * [system limits](#system-limits)
+3. [RabbitMQ 集群](#rabbitmq-)
+    * [手动创建集群](#section-5)
+    * [重启集群](#section-6)
+    * [破坏集群](#section-7)
+    * [自动创建集群](#section-8)
+4. [fuel 中的 RabbitMQ](#fuel--rabbitmq)
 
 ### 安装
 
