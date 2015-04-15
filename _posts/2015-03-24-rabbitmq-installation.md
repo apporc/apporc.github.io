@@ -19,7 +19,6 @@ categories: rabbitmq
     * [破坏集群](#)
     * [自动创建集群](#)
 4. [fuel中的RabbitMQ](#ee)
-5. [参考链接]()
 
 ### 安装
 
@@ -173,7 +172,7 @@ rabbitmq 会维持大量的网络连接，所以系统允许打开的最大文�
 
     查看一下集群的状态，
 
-        rabbitmqctl cluster_status
+        rabbit$ rabbitmqctl cluster_status
 
         Cluster status of node 'rabbit@rabbit' ...
         [{nodes,[{disc,['rabbit@rabbit1','rabbit@rabbit2',
@@ -254,10 +253,98 @@ rabbitmq 会维持大量的网络连接，所以系统允许打开的最大文�
 该种方式存在的问题是：　只对于从未启动过的或重置过的 rabbitmq 节点可用，其它的不行。
 
 
-#### fuel中的rabbitmq
+#### fuel 中的 rabbitmq
+
+1.  fuel 中的 rabbitmq 由 pacemaker 管理
+
+    其控制脚本路径为 /usr/lib/ocf/resource.d/mirantis/rabbitmq-server
+
+    多节点环境下，rabbitmq 节点有 Master 和 Slave 两种身份。确认 rabbitmq-server 状态：
+
+        crm resource list 
+
+    在其中找到关于 rabbitmq-server 的信息，类似：
+
+        Master/Slave Set: master_p_rabbitmq-server [p_rabbitmq-server]
+            Masters: [ node-3.domain.tld ]
+            Slaves: [ node-1.domain.tld node-2.domain.tld ]
+
+    如果有某个节点上服务已停止，则有节点状态为 Stopped：
+
+        Master/Slave Set: master_p_rabbitmq-server [p_rabbitmq-server]
+            Masters: [ node-1.domain.tld ]
+            Slaves: [ node-3.domain.tld ]
+            Stopped: [ node-2.domain.tld ]
+
+    或者某个节点上服务出现故障，则有节点状态为 FAILED：
+
+        Master/Slave Set: master_p_rabbitmq-server [p_rabbitmq-server]
+            p_rabbitmq-server  (ocf::mirantis:rabbitmq-server):        FAILED 
+            Masters: [ node-11.eayun.test ]
+            Slaves: [ node-10.eayun.test ]
+
+    你也可以使用如下命令来查看状态：
+
+        crm resource show master_p_rabbitmq-server
+
+2.  使用 rabbitmqctl 查看集群状态
+
+    使用 pacemnaker 提供的工具查看 rabbitmq 的状态，所查看到的状态仅仅是 rabbitmq-server  
+    服务的状态，更准确的状态需要通过 rabbitmq 自身提供的工具。
+
+    查看单一节点的状态 (进程 pid，版本，在运行的程序，占用内存，侦听的端口等详细信息)：
+
+        rabbitmqctl status
+
+    查看集群状态 (集群中某节点的运行状态)：
+
+        rabbit$ rabbitmqctl cluster_status
+
+        Cluster status of node 'rabbit@rabbit' ...
+        [{nodes,[{disc,['rabbit@rabbit1','rabbit@rabbit2',
+                        'rabbit@rabbit3','rabbit@rabbit4',
+                        'rabbit@rabbit']}]},
+        {running_nodes,['rabbit@rabbit1','rabbit3@rabbit2',
+                        'rabbit@rabbit3','rabbit1@rabbit4',
+                        'rabbit@rabbit']},
+        {cluster_name,<<"rabbit@rabbit">>},
+        {partitions,[]}]
+        ...done.
+
+    返回结果中，nodes 一行是本集群所有的节点名称，running_nodes 则是运行状态的节点名称。  
+    不在 running_nodes 中而在 nodes 中的节点即为故障的节点。  
+    抛开所有节点不谈，只要 partitions 不为空，则集群状态已出现故障。
+
+3.  配置部分
+
+    * 端口
+
+        fuel 所部署的 OpenStack中 haproxy 作为 rabbitmq 的负载均衡器，它监听 5672  
+        端口，然后将请求转发至5673。然而就目前观察，OpenStack 中并没有服务使用了 haproxy  
+        提供的该 5672 端口的服务，各 OpenStack 服务都是直接连接节点的 5673 端口。
+
+    * system limits
+
+        Fuel 在 /etc/security/limits.conf 中设置了 system limits：
+        最大文件数的 soft limits 102400，hard limits 为 112640。
+
+    * vhosts 和 user
+
+        只有一个默认虚拟主机，列出虚拟机主机：
+
+            # rabbitmqctl list_vhosts
+            Listing vhosts ...
+            /
+            ...done
+
+        只有一个用户 nova，所有 OpenStack 服务都使用该用户连到 rabbitmq，列出用户：
+
+            # rabbitmqctl list_users
+            Listing users ...
+            nova    [administrator]
+            ...done.
 
  [1]:http://fedoraproject.org/wiki/EPEL/FAQ#howtouse
  [2]:https://www.rabbitmq.com/install-rpm.html
  [3]:https://www.erlang-solutions.com/downloads/download-erlang-otp
  [4]:https://www.rabbitmq.com/releases/erlang/
-
