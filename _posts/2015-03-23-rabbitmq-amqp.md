@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "amqp 基本概念"
+title:  "RabbitMQ：amqp 基本概念"
 date:   2015-03-23 11:52:00
 categories: amqp rabbitmq
 ---

@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Nova 虚拟机启动流程"
+title:  "OpenStack Nova：虚拟机启动流程"
 date:   2015-03-19 17:35:00
 categories: OpenStack
 ---

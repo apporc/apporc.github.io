@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "RabbitMQ"
+title:  "RabbitMQ：安装与基本操作"
 date:   2015-03-23 11:52:00
 categories: rabbitmq
 ---
@@ -323,6 +323,8 @@ rabbitmq 会维持大量的网络连接，所以系统允许打开的最大文�
         端口，然后将请求转发至5673。然而就目前观察，OpenStack 中并没有服务使用了 haproxy  
         提供的该 5672 端口的服务，各 OpenStack 服务都是直接连接节点的 5673 端口。
 
+    0     0 ACCEPT     tcp  --  *      *       172.16.100.2         0.0.0.0/0            multiport sports 4369,5672,15672,41055,55672,61613 /* 003 remote rabbitmq  */
+98358 5901K ACCEPT     tcp  --  *      *       0.0.0.0/0            0.0.0.0/0            multiport ports 4369,5672,5673,41055 /* 106 rabbitmq  */
     * system limits
 
         Fuel 在 /etc/security/limits.conf 中设置了 system limits：
