@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Fuel Plugin Development"
+title:  "Fuel：插件开发简介"
 date:   2015-03-05 17:25:00
 categories: OpenStack
 ---

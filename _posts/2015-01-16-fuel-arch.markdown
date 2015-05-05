@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Fuel 架构简介"
+title:  "Fuel：架构简介"
 date:   2015-01-16 19:50:00
 categories: OpenStack
 ---
