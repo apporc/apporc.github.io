@@ -73,6 +73,7 @@ testtools 与 unittest 的使用方式基本是一致的，本文只以 testtool
     python -m testtools.run someserver_test.SomeTestCase
 
 要点：
+
 1. 新建用例继承 testtools.TestCase，如示例中 SomeTestCase。
 2. 为 SomeTestCase 定义 setUp 方法，为测试做环境准备。
     示例中生成了待测代码 SomeServer 的一个实例 self.server
