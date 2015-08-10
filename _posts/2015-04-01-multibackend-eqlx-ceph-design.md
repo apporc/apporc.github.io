@@ -1,3 +1,10 @@
+---
+layout: post
+title:  "Fuel eqlx/ceph 多后端设计"
+date:   2015-03-05 17:25:00
+categories: OpenStack
+---
+
 # fuel eqlx/ceph multibackend design
 
 ### Table of Contents
