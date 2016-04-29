@@ -1,0 +1,265 @@
+digraph nova_boot_instance {
+  layout="dot";
+  rankdir="TB";
+  graph [style="dashed" labeljust="l" weight="999"];
+  edge [style="solid" overlap="false"];
+  node [style="rounded" shape="rect"];
+
+  // nova-api procedure
+  subgraph cluster_nova_api {
+    label="nova-api";
+    rank="same";
+
+    // nova/api/openstack/compute/servers.py
+    subgraph cluster_nova_compue_servers {
+      label="nova/api/openstack/compute/servers.py";
+      nova_compute_servers [label="Controllers.create()"];
+    }
+
+    nova_compute_servers -> nova_compute_api_create [label="(1)"];
+
+    // nova/compute/api.py
+    subgraph cluster_nova_compute_api {
+      label="nova/compute/api.py";
+      nova_compute_api_create [label="API.create()"];
+      nova_compute_api_create_instance [label="API._create_instance()"];
+      nova_compute_api_provision_instances [label="API._provision_instances()"];
+      nova_compute_api_create_db_entry_for_new_instance [label="API.create_db_entry_for_new_instance()"];
+
+      nova_compute_api_create -> nova_compute_api_create_instance [label="(2)"];
+      nova_compute_api_provision_instances -> nova_compute_api_create_db_entry_for_new_instance [label="(4)"];
+      nova_compute_api_create_instance -> nova_compute_api_provision_instances [label="(3)"];
+      nova_compute_api_create_db_entry_for_new_instance -> nova_compute_api_create_instance [label="(5)"];
+    }
+
+    nova_compute_api_create_instance -> nova_conductor_api_build_instances [label="(6)"];
+
+    // nova/conductor/api.py
+    subgraph cluster_nova_conductor_api {
+      label="nova/conductor/api.py";
+      nova_conductor_api_build_instances [label="ComputeTaskAPI.build_instances()"];
+    }
+
+    nova_conductor_api_build_instances -> nova_conductor_rpcapi_build_instances [label="(7)"];
+
+    // nova/conductor/rpcapi.py
+    subgraph cluster_nova_conductor_rpcapi {
+      label="nova/conductor/rpcapi.py";
+      nova_conductor_rpcapi_build_instances [label="ComputeTaskAPI.build_instances()"];
+    }
+
+  }
+
+  // nova-conductor
+  subgraph cluster_nova_conductor {
+    label="nova-conductor";
+
+    // nova/conductor/manager.py
+    subgraph cluster_nova_conductor_manager {
+      label="nova/conductor/manager.py";
+      nova_conductor_manager_build_instances [label="ComputeTaskManager.build_instances()"];
+    }
+
+    // nova/scheduler/client/__init__.py
+    subgraph cluster_nova_scheduler_client {
+      label="nova/scheduler/client/__init__.py";
+      nova_scheduler_client_select_destinations [label="SchedulerClient.select_destinations()"];
+    }
+
+    // nova/scheduler/client/query.py
+    subgraph cluster_nova_scheduler_client_query {
+      label="nova/scheduler/client/query.py";
+      nova_scheduler_client_query_select_destinations [label="SchedulerQueryClient.select_destinations()"];
+    }
+
+    // nova/scheduler/rpcapi.py
+    subgraph cluster_nova_scheduler_rpcapi {
+      label="nova/scheduler/rpcapi.py";
+      nova_scheduler_rpcapi_select_destinations [label="SchedulerAPI.select_destinations()"];
+    }
+
+    // nova/compute/rpcapi.py
+    subgraph  cluster_nova_compute_rpcapi {
+      label="nova/compute/rpcapi.py";
+      nova_compute_rpcapi_build_and_run_instance [label="ComputeAPI.build_and_run_instance()"];
+    }
+
+    nova_conductor_manager_build_instances -> nova_scheduler_client_select_destinations [label="(1)"];
+    nova_scheduler_client_select_destinations -> nova_scheduler_client_query_select_destinations [label="(2)"];
+    nova_scheduler_client_query_select_destinations -> nova_scheduler_rpcapi_select_destinations [label="(3)"];
+    nova_scheduler_rpcapi_select_destinations -> nova_conductor_manager_build_instances [label="(4)"];
+
+    nova_conductor_manager_build_instances -> nova_compute_rpcapi_build_and_run_instance [label="(5)"];
+  }
+
+  // nova-scheduler
+  subgraph cluster_nova_scheduler {
+    label="nova-scheduler";
+
+    // nova/scheduler/manager.py
+    subgraph cluster_nova_scheduler_manager {
+      label="nova/scheduler/manager.py";
+      nova_scheduler_manager_select_destinations [label="SchedulerManager.select_destinations()"];
+    }
+
+    // nova/scheduler/filter_scheduler.py
+    subgraph cluster_nova_scheduler_filter_scheduler {
+      label="nova/scheduler/filter_scheduler.py";
+      nova_scheduler_filter_scheduler_select_destinations [label="FilterScheduler.select_destinations()"];
+      nova_scheduler_filter_scheduler__schedule [label="FilterScheduler._schedule()"];
+      nova_scheduler_filter_scheduler__get_all_host_states [label="FilterScheduler._get_all_host_states()"];
+
+      nova_scheduler_filter_scheduler_select_destinations -> nova_scheduler_filter_scheduler__schedule [label="(2)"];
+      nova_scheduler_filter_scheduler__schedule -> nova_scheduler_filter_scheduler_select_destinations [label="(10)"];
+      nova_scheduler_filter_scheduler__schedule -> nova_scheduler_filter_scheduler__get_all_host_states [label="(3)"];
+    }
+
+    nova_scheduler_manager_select_destinations -> nova_scheduler_filter_scheduler_select_destinations [label="(1)"];
+    nova_scheduler_filter_scheduler_select_destinations -> nova_scheduler_manager_select_destinations [label="(11)"];
+
+    // nova/scheduler/host_manager.py
+    subgraph cluster_nova_scheduler_host_manager {
+      label="nova/scheduler/host_manager.py";
+      nova_scheduler_host_manager_get_all_host_states [label="HostManager.get_all_host_states()"];
+      nova_scheduler_host_manager_get_filtered_hosts [label="HostManager.get_filtered_hosts()"];
+      nova_scheduler_host_manager_get_weighed_hosts [label="HostManager.get_weighed_hosts()"];
+    }
+
+    nova_scheduler_filter_scheduler__get_all_host_states -> nova_scheduler_host_manager_get_all_host_states [label="(4)"];
+    nova_scheduler_host_manager_get_all_host_states -> nova_scheduler_filter_scheduler__schedule [label="(5)"];
+
+    nova_scheduler_filter_scheduler__schedule -> nova_scheduler_host_manager_get_filtered_hosts [label="(6)"];
+    nova_scheduler_host_manager_get_filtered_hosts -> nova_scheduler_filter_scheduler__schedule [label="(7)"];
+    nova_scheduler_filter_scheduler__schedule -> nova_scheduler_host_manager_get_weighed_hosts [label="(8)"];
+    nova_scheduler_host_manager_get_weighed_hosts -> nova_scheduler_filter_scheduler__schedule [label="(9)"];
+
+  }
+
+  nova_scheduler_manager_select_destinations -> rabbitmq [label="reply to nova-conductor"];
+  rabbitmq -> nova_scheduler_manager_select_destinations [label="consume message from topic:scheduler"]
+
+  nova_conductor_rpcapi_build_instances -> rabbitmq [dir="forward" label="cast to topic:conductor"];
+
+  nova_conductor_manager_build_instances -> rabbitmq [dir="back" label="consume message from topic:conductor"];
+  nova_scheduler_rpcapi_select_destinations -> rabbitmq [dir="both" label="call to topic:scheduler"];
+  nova_compute_rpcapi_build_and_run_instance -> rabbitmq [dir="forward" label="cast to topic:compute-computeN"];
+
+  // nova-compute
+  subgraph cluster_nova_compute {
+    label="nova-computeN";
+
+    // nova/compute/manager.py
+    subgraph cluster_nova_compute_manager {
+      label="nova/compute/manager.py";
+      nova_compute_manager_build_and_run_instance [label="ComputeManager.build_and_run_instance()"];
+      nova_compute_manager__build_and_run_instance [label="ComputeManager._build_and_run_instance()"];
+      nova_compute_manager__build_resources [label="ComputeManager._build_resources()"];
+      nova_compute_manager__build_networks_for_instance [label="ComputeManager._build_networks_for_instance()"];
+      nova_compute_manager__prep_block_device [label="ComputeManager._prep_block_device()"];
+      nova_compute_manager_cleanup_allocated_networks [label="ComputeManager._cleanup_allocated_networks()"];
+      nova_compute_manager_allocate_network [label="ComputeManager._allocate_network()"];
+
+      nova_compute_manager_build_and_run_instance -> nova_compute_manager__build_and_run_instance [label="(1)"];
+      nova_compute_manager__build_and_run_instance -> nova_compute_manager_build_and_run_instance [label="(28)"];
+      nova_compute_manager__build_and_run_instance -> nova_compute_manager__build_resources [label="(2)"];
+      nova_compute_manager__build_resources -> nova_compute_manager__build_networks_for_instance [label="(3)"];
+      nova_compute_manager__build_resources -> nova_compute_manager__prep_block_device [label="(7)"];
+      nova_compute_manager__build_resources -> nova_compute_manager__build_and_run_instance [label="(11)"];
+      nova_compute_manager__build_networks_for_instance -> nova_compute_manager_allocate_network [label="(4)"]
+
+      nova_compute_manager_build_and_run_instance -> nova_compute_manager_cleanup_allocated_networks [label="(29) reschedule if necessary."];
+      nova_compute_manager_cleanup_allocated_networks -> nova_compute_manager_build_and_run_instance [label="(30)"];
+
+    }
+
+    nova_compute_manager__build_and_run_instance -> nova_virt_libvirt_driver_spawn [label="(12)"];
+    // nova_compute_manager__build_and_run_instance -> rabbitmq [label="(15)"];
+
+    // nova/virt/libvirt/driver.py
+    subgraph cluster_nova_virt_libvirt_driver {
+      label="nova/virt/libvirt/driver.py";
+      nova_virt_libvirt_driver_spawn [label="LibvirtDriver.spawn()"];
+      nova_virt_libvirt_driver_create_image [label="LibvirtDriver._create_image()"];
+      nova_virt_libvirt_driver_get_guest_xml [label="LibvirtDriver._get_guest_xml()"];
+      nova_virt_libvirt_driver_create_domain_and_network [label="LibvirtDriver._create_domain_and_network()"];
+      // nova_virt_libvirt_driver_nova_virt_libvirt_driver_deallocate_networks_on_reschedule [label="LibvirtDriver.deallocate_networks_on_reschedule()"];
+      nova_virt_libvirt_driver_connect_volume [label="LibvirtDriver._connect_volume()"];
+      nova_virt_libvirt_driver_plug_vifs [label="Libvirtdriver.plug_vifs()"];
+
+      nova_virt_libvirt_driver_spawn -> nova_virt_libvirt_driver_create_image [label="(13)"];
+      nova_virt_libvirt_driver_spawn -> nova_virt_libvirt_driver_get_guest_xml [label="(16)"];
+      nova_virt_libvirt_driver_get_guest_xml -> nova_virt_libvirt_driver_spawn [label="(17)"];
+      nova_virt_libvirt_driver_spawn -> nova_virt_libvirt_driver_create_domain_and_network [label="(18)"];
+      nova_virt_libvirt_driver_create_domain_and_network -> nova_virt_libvirt_driver_spawn  [label="(26)"];
+      nova_virt_libvirt_driver_create_domain_and_network -> nova_virt_libvirt_driver_connect_volume [label="(19)"];
+      nova_virt_libvirt_driver_create_domain_and_network -> nova_virt_libvirt_driver_plug_vifs [label="(22)"];
+    }
+    nova_virt_libvirt_driver_spawn -> nova_compute_manager__build_and_run_instance [label="(27)"];
+
+    // nova/conductor/rpcapi.py
+    subgraph cluster_nova_conductor_rpcapi2 {
+      label="nova/conductor/rpcapi.py";
+      nova_conductor_rpcapi_build_instances2 [label="ComputeTaskAPI.build_instances()"];
+    }
+    nova_compute_manager_build_and_run_instance -> nova_conductor_rpcapi_build_instances2 [label="(31)"];
+    nova_conductor_rpcapi_build_instances2 -> rabbitmq [dir="forward" label="cast to topic:conductor"];
+
+    // nova/network/neutronv2/api.py
+    subgraph cluster_nova_neutronv2_api {
+      label="nova/network/neutronv2/api.py";
+      nova_neutronv2_api_allocate_for_instance [label="API.allocate_for_instance()"];
+    }
+    nova_compute_manager_allocate_network -> nova_neutronv2_api_allocate_for_instance [label="(5) take neutron for example"];
+    nova_neutronv2_api_allocate_for_instance -> nova_compute_manager__build_resources [label="(6)"];
+
+    // nova/virt/block_device.py
+    subgraph cluster_nova_virt_block_device {
+      label="nova/virt/block_device.py";
+      nova_virt_block_device_attach_block_devices [label="attach_block_devices()"]
+      nova_virt_block_device_attach [label="DriverBlockDevice.attach()"]
+      nova_virt_block_device_attach_block_devices -> nova_virt_block_device_attach [label="(9)"]
+    }
+    nova_compute_manager__prep_block_device -> nova_virt_block_device_attach_block_devices [label="(8)"]
+    nova_virt_block_device_attach -> nova_compute_manager__build_resources [label="(10)"]
+
+    // nova/virt/libvirt/imagebackend.py
+    subgraph cluster_nova_virt_libvirt_imagebackend {
+      label="nova/virt/libvirt/imagebackend.py"
+      nova_virt_libvirt_imagebackend_clone [label="Rbd.clone()"]
+    }
+    nova_virt_libvirt_driver_create_image -> nova_virt_libvirt_imagebackend_clone [label="(14) take rbd for example"]
+    nova_virt_libvirt_imagebackend_clone -> nova_virt_libvirt_driver_spawn [label="(15)"]
+
+    // nova/virt/libvirt/volume.py
+    subgraph cluster_nova_virt_libvirt_volume {
+      label="nova/virt/libvirt/volume.py"
+      nova_virt_libvirt_volume_connect_volume [label="LibvirtNetVolumeDriver.connect_volume()"]
+    }
+    nova_virt_libvirt_driver_connect_volume -> nova_virt_libvirt_volume_connect_volume [label="(20) take rbd for example"]
+    nova_virt_libvirt_volume_connect_volume -> nova_virt_libvirt_driver_create_domain_and_network [label="(21)"]
+
+    // nova/virt/libvirt/vif.py
+    subgraph cluster_nova_virt_libvirt_vif {
+      label="nova/virt/libvirt/vif.py"
+      nova_virt_libvirt_vif_plug [label="LibvirtGenericVIFDriver.plug()"]
+      nova_virt_libvirt_plug_ovs [label="LibvirtGenericVIFDriver.plug_ovs()"]
+      nova_virt_libvirt_vif_plug -> nova_virt_libvirt_plug_ovs [label="(24) take ovs for example"]
+    }
+    nova_virt_libvirt_driver_plug_vifs -> nova_virt_libvirt_vif_plug [label="(23)"]
+    nova_virt_libvirt_plug_ovs -> nova_virt_libvirt_driver_create_domain_and_network [label="(25)"]
+  };
+
+  rabbitmq -> nova_compute_manager_build_and_run_instance [dir="forward" label="consume message from topic:compute-computeN"];
+
+  rabbitmq [label="RabbitMQ"];
+
+  neutron [label="Neutron Server"];
+
+  nova_neutronv2_api_allocate_for_instance -> neutron [label="Rest API"]
+
+  cinder [label="Cinder API"];
+  nova_virt_block_device_attach -> cinder [label="Rest API"]
+
+  database [label="Database"];
+  nova_compute_api_create_db_entry_for_new_instance -> database [label="communicate with db"]
+}

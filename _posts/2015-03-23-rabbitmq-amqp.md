@@ -24,8 +24,8 @@ categories: amqp rabbitmq
 
 AMQP(Advanced Message Queuing Protocol)，即高级消息队列协议，是一种应用层网络协  
 议，它为特定客户端应用(application)与消息中间件代理(messaging middleware broker)
-之间的通信提供支持。本文针对AMQP 0-9-1 模型作一个简单的介绍，该模型即rabbitmq所
-使用的模型。
+之间的通信提供支持。AMQP 协议有过多个版本，本文所说的是 0-9-1，针对AMQP 0-9-1 协
+议模型作一个简单的介绍，该模型即 rabbitmq 所使用的模型。
 
 ### 模型简介
 
